@@ -1,0 +1,521 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: A network stack for deploying the required infrastructure
+Parameters:
+  cidr:
+    Type: String
+    AllowedPattern: "((\\d{1,3})\\.){3}\\d{1,3}/\\d{1,2}"
+    Description: A CIDR block for the network e.g. 10.0.0.0/16
+    ConstraintDescription: must be a valid cidr ip block
+    MinLength: 10
+    MaxLength: 19
+
+Resources:
+  demoVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock:
+        Ref: cidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+      - Key: Name
+        Value: demo-vpc
+    
+  igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: demo-igw
+    
+  igwassoc:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: igw
+      VpcId:
+        Ref: demoVPC
+
+  demoNACL:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId:
+        Ref: demoVPC
+
+  naclOutgoing:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: 'true'
+      Protocol: "-1"
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId:
+        Ref: demoNACL
+
+  naclIncoming:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Protocol: "-1"
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId:
+        Ref: demoNACL  
+  
+  ############################################################
+  # Public Route Tables
+  ############################################################  
+  publicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: demoVPC
+      Tags:
+      - Key: Name
+        Value: public
+  
+  privateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: demoVPC
+      Tags:
+      - Key: Name
+        Value: private
+
+     
+  ############################################################
+  # Subnets
+  ############################################################  
+  publicSubneta:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: demoVPC
+      MapPublicIpOnLaunch: 'True'
+      AvailabilityZone:
+        Fn::Join:
+        - ''
+        - - Ref: AWS::Region
+          - a
+      CidrBlock:
+        Fn::Select:
+        - 1
+        - Fn::Cidr:
+          - Ref: cidr
+          - 13
+          - 8
+      Tags:
+      - Key: Name
+        Value: public_a 
+
+  publicSubnetb:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: demoVPC
+      MapPublicIpOnLaunch: 'True'
+      AvailabilityZone:
+        Fn::Join:
+        - ''
+        - - Ref: AWS::Region
+          - b
+      CidrBlock:
+        Fn::Select:
+        - 2
+        - Fn::Cidr:
+          - Ref: cidr
+          - 13
+          - 8
+      Tags:
+      - Key: Name
+        Value: public_b
+
+  publicSubnetc:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: demoVPC
+      MapPublicIpOnLaunch: 'True'
+      AvailabilityZone:
+        Fn::Join:
+        - ''
+        - - Ref: AWS::Region
+          - c
+      CidrBlock:
+        Fn::Select:
+        - 3
+        - Fn::Cidr:
+          - Ref: cidr
+          - 13
+          - 8
+      Tags:
+      - Key: Name
+        Value: public_c
+
+  
+  appPrivateSubneta:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: demoVPC
+      MapPublicIpOnLaunch: 'False'
+      AvailabilityZone:
+        Fn::Join:
+        - ''
+        - - Ref: AWS::Region
+          - a
+      CidrBlock:
+        Fn::Select:
+        - 4
+        - Fn::Cidr:
+          - Ref: cidr
+          - 13
+          - 8
+      Tags:
+      - Key: Name
+        Value: private_a
+  
+  appPrivateSubnetb:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: demoVPC
+      MapPublicIpOnLaunch: 'False'
+      AvailabilityZone:
+        Fn::Join:
+        - ''
+        - - Ref: AWS::Region
+          - b
+      CidrBlock:
+        Fn::Select:
+        - 5
+        - Fn::Cidr:
+          - Ref: cidr
+          - 13
+          - 8
+      Tags:
+      - Key: Name
+        Value: private_b
+
+  appPrivateSubnetc:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: demoVPC
+      MapPublicIpOnLaunch: 'False'
+      AvailabilityZone:
+        Fn::Join:
+        - ''
+        - - Ref: AWS::Region
+          - c
+      CidrBlock:
+        Fn::Select:
+        - 6
+        - Fn::Cidr:
+          - Ref: cidr
+          - 13
+          - 8
+      Tags:
+      - Key: Name
+        Value: private_c
+
+  
+
+  ###########################################################################
+  # Subnet associations to NACL
+  ###########################################################################
+  publicSubnetAnaclassoc:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId:
+        Ref: demoNACL
+      SubnetId:
+        Ref: publicSubneta
+  
+  publicSubnetBnaclassoc:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId:
+        Ref: demoNACL
+      SubnetId:
+        Ref: publicSubnetb
+
+  publicSubnetCnaclassoc:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId:
+        Ref: demoNACL
+      SubnetId:
+        Ref: publicSubnetc
+
+  
+
+  appPrivateSubnetAnaclassoc:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId:
+        Ref: demoNACL
+      SubnetId:
+        Ref: appPrivateSubneta
+
+  appPrivateSubnetBnaclassoc:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId:
+        Ref: demoNACL
+      SubnetId:
+        Ref: appPrivateSubnetb
+
+  appPrivateSubnetCnaclassoc:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId:
+        Ref: demoNACL
+      SubnetId:
+        Ref: appPrivateSubnetc
+
+  
+  
+  ##################################################################
+  # Route table associations to subnet
+  ##################################################################
+  
+  publicSubnetAassoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: 
+        Ref: publicRouteTable
+      SubnetId: 
+        Ref: publicSubneta
+
+  publicSubnetBassoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: 
+        Ref: publicRouteTable
+      SubnetId: 
+        Ref: publicSubnetb
+
+  publicSubnetCassoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: 
+        Ref: publicRouteTable
+      SubnetId: 
+        Ref: publicSubnetc
+
+  appPrivateSubnetAassoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: 
+        Ref: privateRouteTable
+      SubnetId: 
+        Ref: appPrivateSubneta
+
+  appPrivateSubnetBassoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: 
+        Ref: privateRouteTable
+      SubnetId: 
+        Ref: appPrivateSubnetb
+
+  appPrivateSubnetCassoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: 
+        Ref: privateRouteTable
+      SubnetId: 
+        Ref: appPrivateSubnetc
+  
+  ###################################################################
+  # Security Group
+  ###################################################################
+
+  BastionHostSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allows SSH connections from the Internet
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '0.0.0.0/0'
+      VpcId:
+        Ref: demoVPC
+      Tags:
+        - Key: Name
+          Value: Bastion Host SG
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allows http connections from the Internet
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+      VpcId:
+        Ref: demoVPC
+      Tags:
+        - Key: Name
+          Value: ELB SG
+
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allows web connections from the Internet
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId:
+            Ref: LoadBalancerSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId:
+            Ref: BastionHostSecurityGroup
+      VpcId:
+        Ref: demoVPC
+      Tags:
+        - Key: Name
+          Value: SG for web server
+
+  DBSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Open database for access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '3306'
+          ToPort: '3306'
+          SourceSecurityGroupId:
+            Ref: ServerSecurityGroup
+      VpcId: !Ref demoVPC
+
+##################################################################################
+# Nat Gateway and Elastic IP
+##################################################################################
+  elasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: demoVPC
+  
+  natGateway:
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId: 
+        Fn::GetAtt:
+        - elasticIp
+        - AllocationId
+      SubnetId: 
+        Ref: publicSubnetb
+      Tags:
+      - Key: Name
+        Value: demo-nat
+
+  ############################################################
+  # Routes
+  ############################################################  
+  internetroute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId:
+        Ref: publicRouteTable
+      GatewayId:
+        Ref: igw
+    DependsOn: igwassoc
+  
+  routetoNat:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: 
+        Ref: natGateway
+      RouteTableId: 
+        Ref: privateRouteTable
+
+Outputs:
+  PubSubnetA:
+    Description: The ID of the first public subnet
+    Value: !Ref publicSubneta
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-PublicSubneta
+
+  PubSubnetB:
+    Description: The ID of the second public subnet
+    Value:
+      Ref: publicSubnetb
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-PublicSubnetb
+
+  PubSubnetC:
+    Description: The ID of the third public subnet
+    Value:
+      Ref: publicSubnetc
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-PublicSubnetc
+
+  PriSubnetA:
+    Description: The ID of the first private subnet
+    Value: !Ref appPrivateSubneta
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-PrivateSubneta
+
+  PriSubnetB:
+    Description: The ID of the second private subnet
+    Value:
+      Ref: appPrivateSubnetb
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-PrivateSubnetb
+
+  PriSubnetC:
+    Description: The ID of the third private subnet
+    Value:
+      Ref: appPrivateSubnetc
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-PrivateSubnetc
+
+  BastionSG:
+    Description: The SG for bastion server
+    Value:
+      Ref: BastionHostSecurityGroup
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-BastionHostSecurityGroup
+
+  ServerSG:
+    Description: The SG for web server
+    Value:
+      Ref: ServerSecurityGroup
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-ServerSecurityGroup
+
+  ELBSG:
+    Description: The SG for ELB
+    Value:
+      Ref: LoadBalancerSecurityGroup
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-LoadBalancerSecurityGroup
+
+  DBSG:
+    Description: The SG for ELB
+    Value:
+      Ref: DBSecurityGroup
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-DBSecurityGroup
